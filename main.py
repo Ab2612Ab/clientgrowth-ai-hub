@@ -1,12 +1,12 @@
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 BASE = Path(__file__).parent
-app = FastAPI(title="ClientGrowth AI Command Center")
+app = FastAPI(title="ClientGrowth AI Command Center", version="1.0.1")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")
 
@@ -44,16 +44,7 @@ def audit(request: Request):
 @app.post("/audit", response_class=HTMLResponse)
 def run_audit(request: Request, url: str = Form(...)):
     clean = url.replace("https://","").replace("http://","").strip("/")
-    report = {
-        "url": clean,
-        "score": 63,
-        "findings":[
-            ("Mobile conversion", "Needs attention", "Primary actions should be easier to reach on small screens."),
-            ("Trust signals", "Opportunity", "Add reviews, case studies and recognizable proof near key CTAs."),
-            ("Performance", "Opportunity", "Compress hero media and defer non-critical assets."),
-            ("Lead capture", "Needs attention", "Use a shorter contact path with one clear conversion goal."),
-        ]
-    }
+    report = {"url": clean, "score": 63, "findings":[("Mobile conversion", "Needs attention", "Primary actions should be easier to reach on small screens."),("Trust signals", "Opportunity", "Add reviews, case studies and recognizable proof near key CTAs."),("Performance", "Opportunity", "Compress hero media and defer non-critical assets."),("Lead capture", "Needs attention", "Use a shorter contact path with one clear conversion goal.")]}
     return templates.TemplateResponse("audit.html", {"request":request, "active":"audit", "report":report})
 
 @app.get("/outreach", response_class=HTMLResponse)
@@ -71,12 +62,7 @@ def resume(request: Request):
 
 @app.get("/automations", response_class=HTMLResponse)
 def automations(request: Request):
-    flows = [
-        ("Lead discovery", "Search → qualify → enrich → pipeline", "Ready"),
-        ("Website audit", "URL → checks → opportunity report", "Ready"),
-        ("Outreach", "Signal → personalization → review queue", "Ready"),
-        ("Follow-up", "No reply → timed reminder → task", "Planned"),
-    ]
+    flows = [("Lead discovery", "Search → qualify → enrich → pipeline", "Ready"),("Website audit", "URL → checks → opportunity report", "Ready"),("Outreach", "Signal → personalization → review queue", "Ready"),("Follow-up", "No reply → timed reminder → task", "Planned")]
     return templates.TemplateResponse("automations.html", {"request":request, "active":"automations", "flows":flows})
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -85,4 +71,12 @@ def settings(request: Request):
 
 @app.get("/health")
 def health():
-    return {"status":"ok", "service":"clientgrowth-ai-hub", "time":datetime.utcnow().isoformat()}
+    return {"status":"ok", "service":"clientgrowth-ai-hub", "time":datetime.now(timezone.utc).isoformat()}
+
+@app.get("/api")
+def api_root():
+    return {"status":"ok", "service":"clientgrowth-ai-hub", "version":"1.0.1", "endpoints":["/api/health","/health"]}
+
+@app.get("/api/health")
+def api_health():
+    return {"status":"ok", "service":"clientgrowth-ai-hub", "time":datetime.now(timezone.utc).isoformat()}
