@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Prospect Intelligence · ClientGrowth AI{% endblock %}
+{% block crumb %}PROSPECT INTELLIGENCE{% endblock %}
+{% block content %}
+<section class="pagehead"><div><p class="eyebrow">REAL PROVIDER DATA</p><h1>Find businesses that actually need your service.</h1><p class="muted">Search Google Places, classify website presence, surface high-opportunity signals and save qualified prospects. No fake leads.</p></div></section>
+<section class="panel">
+<form method="post" action="/intelligence" class="formgrid">
+<label>Business type / query<input name="query" value="{{ query|default('') }}" placeholder="roofing companies, property managers, auto dealers…" required></label>
+<label>Location<input name="location" value="{{ location|default('') }}" placeholder="Atlanta, GA"></label>
+<label>Results<select name="limit"><option>10</option><option>20</option></select></label>
+<button class="button" type="submit">Run live intelligence</button>
+</form>
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+</section>
+<section class="panel">
+<div class="sectionhead"><div><h2>Opportunity indicators</h2><p class="muted">Website status is based on returned public data. WhatsApp registration is never guessed.</p></div></div>
+{% if rows %}
+<div class="tablewrap"><table><thead><tr><th>Business</th><th>Priority</th><th>Website</th><th>Signals</th><th>Contact</th><th>Action</th></tr></thead><tbody>
+{% for r in rows %}<tr><td><strong>{{ r.name }}</strong><br><small>{{ r.address }}</small></td><td><strong>{{ r.qualification.priority }}</strong><br>{{ r.qualification.score }}/100</td><td>{{ r.qualification.website_status }}</td><td>{{ r.qualification.signals|join(' · ') }}</td><td>{{ r.phone or 'No public phone returned' }}<br><small>{{ r.qualification.whatsapp_status }}</small></td><td>{% if r.whatsapp_link %}<a class="button secondary" href="{{ r.whatsapp_link }}" target="_blank" rel="noopener">Open WhatsApp</a>{% endif %}{% if r.website %}<a class="button secondary" href="{{ r.website }}" target="_blank" rel="noopener">Website</a>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<div class="empty"><h3>No live results yet</h3><p>Enter a niche and location above. The platform will query the configured Google provider.</p></div>{% endif %}
+</section>
+<section class="panel"><h2>Automation safety</h2><p class="muted">The platform can prepare campaigns and open approved communication channels. Automated bulk sending is restricted to recipients with recorded opt-in and a connected messaging provider.</p></section>
+{% endblock %}
