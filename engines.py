@@ -4,7 +4,7 @@ import re
 import urllib.request
 import urllib.error
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 
 class PageParser(HTMLParser):
@@ -42,7 +42,7 @@ class PageParser(HTMLParser):
 
 
 def http_get(url, timeout=12):
-    request = urllib.request.Request(url, headers={"User-Agent": "ClientGrowthAI/2.0 (+website-audit)"})
+    request = urllib.request.Request(url, headers={"User-Agent": "ClientGrowthAI/2.2 (+website-audit)"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         body = response.read(1_500_000)
         return response.geturl(), response.status, response.headers.get_content_type(), body
@@ -96,10 +96,24 @@ def website_audit(value):
     return {"url": final_url, "status": status, "score": max(0, min(100, score)), "title": parser.title.strip(), "h1": parser.h1[:5], "links": len(parser.links), "forms": parser.forms, "findings": checks}
 
 
+def _place_row(p, source):
+    return {
+        "provider_id": p.get("id") or p.get("place_id"),
+        "name": p.get("displayName", {}).get("text", "") if isinstance(p.get("displayName"), dict) else p.get("name", ""),
+        "address": p.get("formattedAddress") or p.get("display_name", ""),
+        "website": p.get("websiteUri") or p.get("website"),
+        "phone": p.get("nationalPhoneNumber") or p.get("phone"),
+        "maps_url": p.get("googleMapsUri") or p.get("maps_url"),
+        "rating": p.get("rating"),
+        "reviews": p.get("userRatingCount") or p.get("reviews"),
+        "source": source,
+    }
+
+
 def google_places_search(query, location=None, max_results=10):
     key = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_PLACES_API_KEY")
     if not key:
-        raise RuntimeError("GOOGLE_MAPS_API_KEY is not configured. Connect a Google Maps/Places API key to enable real map search.")
+        return free_business_search(query, location, max_results)
     url = "https://places.googleapis.com/v1/places:searchText"
     payload = {"textQuery": query, "pageSize": min(max_results, 20)}
     if location: payload["textQuery"] = f"{query} in {location}"
@@ -111,9 +125,34 @@ def google_places_search(query, location=None, max_results=10):
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="ignore")[:600]
         raise RuntimeError(f"Google Places request failed ({exc.code}): {detail}")
+    return [_place_row(p, "google-places") for p in raw.get("places", [])]
+
+
+def free_business_search(query, location=None, max_results=10):
+    """Keyless public business discovery using OpenStreetMap Nominatim.
+    This is a fallback, not a Google Maps replacement. It uses public place data
+    and identifies the source so users can distinguish providers."""
+    search = f"{query} {location}".strip() if location else query.strip()
+    if not search:
+        raise ValueError("A business query is required.")
+    url = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=" + str(min(max_results, 10)) + "&q=" + quote(search)
+    req = urllib.request.Request(url, headers={"User-Agent": "ClientGrowthAI/2.2 (business-discovery)"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            raw = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="ignore")[:500]
+        raise RuntimeError(f"OpenStreetMap discovery failed ({exc.code}): {detail}")
     results = []
-    for p in raw.get("places", []):
-        results.append({"provider_id":p.get("id"),"name":p.get("displayName",{}).get("text",""),"address":p.get("formattedAddress",""),"website":p.get("websiteUri"),"phone":p.get("nationalPhoneNumber"),"maps_url":p.get("googleMapsUri"),"rating":p.get("rating"),"reviews":p.get("userRatingCount")})
+    for p in raw:
+        address = p.get("display_name", "")
+        maps_url = f"https://www.openstreetmap.org/{p.get('osm_type','node')}/{p.get('osm_id')}" if p.get("osm_id") else None
+        results.append(_place_row({
+            "place_id": p.get("place_id"),
+            "name": p.get("name") or address.split(",")[0],
+            "display_name": address,
+            "maps_url": maps_url,
+        }, "openstreetmap"))
     return results
 
 
@@ -121,7 +160,7 @@ def openai_generate(instruction, input_text):
     key = os.getenv("OPENAI_API_KEY")
     model = os.getenv("OPENAI_MODEL")
     if not key or not model:
-        raise RuntimeError("OPENAI_API_KEY and OPENAI_MODEL must be configured for live AI generation. No simulated response is returned.")
+        raise RuntimeError("OpenAI is optional but not connected. Add OPENAI_API_KEY and OPENAI_MODEL to enable AI generation.")
     payload = {"model": model, "instructions": instruction, "input": input_text}
     data = json.dumps(payload).encode()
     req = urllib.request.Request("https://api.openai.com/v1/responses", data=data, method="POST", headers={"Content-Type":"application/json", "Authorization":f"Bearer {key}"})
