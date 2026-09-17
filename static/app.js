@@ -29,6 +29,7 @@
   }));
 
   $$('.stage-action').forEach(button=>button.addEventListener('click',async()=>{
+    if (button.closest('form')) return; // native server-side form handles this action
     try{
       const data=await json(`/api/leads/${button.dataset.id}/stage`,{method:'PATCH',body:JSON.stringify({stage:button.dataset.stage})});
       button.closest('.deal')?.remove(); toast(`${data.data.name} moved to ${data.data.stage}.`); setTimeout(()=>location.reload(),500);
@@ -36,6 +37,7 @@
   }));
 
   $$('.automation-action').forEach(button=>button.addEventListener('click',async()=>{
+    if (button.closest('form')) return; // native server-side form handles this action
     try{const data=await json(`/api/automations/${button.dataset.automation}`,{method:'POST',body:'{}'});toast(data.message)}catch(err){toast(err.message,false)}
   }));
 
