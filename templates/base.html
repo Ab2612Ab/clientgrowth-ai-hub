@@ -10,18 +10,20 @@
   <aside class="sidebar">
     <a class="brand" href="/"><span class="brandmark">CG</span><span><b>ClientGrowth</b><small>AI Command Center</small></span></a>
     <nav>
+      <div class="navlabel">DISCOVERY</div>
+      <a class="navitem {% if active=='maps' %}active{% endif %}" href="/maps">⌖ <span>Google Places</span></a>
+      <a class="navitem {% if active=='radar' %}active{% endif %}" href="/radar">◎ <span>Lead Radar</span><em>{{ leads|length if leads else 0 }}</em></a>
       <div class="navlabel">WORKSPACE</div>
       <a class="navitem {% if active=='dashboard' %}active{% endif %}" href="/">⌂ <span>Overview</span></a>
-      <a class="navitem {% if active=='radar' %}active{% endif %}" href="/radar">◎ <span>Lead Radar</span><em>{{ leads|length if leads else 0 }}</em></a>
       <a class="navitem {% if active=='pipeline' %}active{% endif %}" href="/pipeline">▦ <span>Opportunity Board</span></a>
       <a class="navitem {% if active=='audit' %}active{% endif %}" href="/audit">⌁ <span>Website X-Ray</span></a>
-      <a class="navitem {% if active=='outreach' %}active{% endif %}" href="/outreach">✦ <span>Outreach Studio</span></a>
+      <a class="navitem {% if active=='outreach' %}active{% endif %}" href="/outreach">✦ <span>AI Outreach</span></a>
       <div class="navlabel">TOOLS</div>
       <a class="navitem {% if active=='resume' %}active{% endif %}" href="/resume">▤ <span>Resume Lab</span></a>
       <a class="navitem {% if active=='automations' %}active{% endif %}" href="/automations">↻ <span>Automation Center</span></a>
       <a class="navitem {% if active=='settings' %}active{% endif %}" href="/settings">⚙ <span>Settings</span></a>
     </nav>
-    <div class="sidebar-bottom"><div class="statusdot"></div><span>System online</span><small>v1.1</small></div>
+    <div class="sidebar-bottom"><div class="statusdot"></div><span>Real engines only</span><small>v2.0</small></div>
   </aside>
   <main class="main">
     <header class="topbar"><div class="crumb">COMMAND CENTER <span>/</span> {% block crumb %}OVERVIEW{% endblock %}</div><div class="top-actions"><span class="live">● LIVE</span><button class="avatar">E</button></div></header>
