@@ -1,1 +1,81 @@
-{% extends 'base.html' %}{% block title %}Automation Center · ClientGrowth AI{% endblock %}{% block crumb %}AUTOMATION CENTER{% endblock %}{% block content %}<section class="pagehead"><div><span class="eyebrow">WORKFLOW ORCHESTRATION</span><h1>Automation Center</h1><p>Map the repeatable steps between discovering an opportunity and starting a conversation.</p></div></section>{% if notice %}<div class="notice">{{notice}}</div>{% endif %}<div class="flow"><div class="flow-node start">SIGNAL<br><small>source</small></div><div class="connector">→</div><div class="flow-node">QUALIFY<br><small>intent + fit</small></div><div class="connector">→</div><div class="flow-node">ENRICH<br><small>context</small></div><div class="connector">→</div><div class="flow-node">REVIEW<br><small>human approval</small></div><div class="connector">→</div><div class="flow-node end">OUTREACH<br><small>send queue</small></div></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">WORKFLOWS</span><h2>Automation recipes</h2></div></div>{% for f in flows %}<div class="workflow-row"><div class="workflow-icon">↻</div><div><b>{{f[0]}}</b><span>{{f[1]}}</span></div><em class="state">{{f[2]}}</em><form method="post" action="/automations/run"><input type="hidden" name="automation" value="{{f[3]}}"><button type="submit" class="secondary automation-action">Run</button></form></div>{% endfor %}</div>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}AI Command Center · ClientGrowth AI{% endblock %}
+{% block crumb %}AI COMMAND CENTER{% endblock %}
+{% block content %}
+<section class="pagehead"><div><span class="eyebrow">AI WORKFLOW ORCHESTRATION</span><h1>Tell the system what you want done.</h1><p>Use the command workspace to turn a prospecting goal into real discovery, website analysis, qualification or outreach preparation. Actions use the connected live engines and never pretend an external action happened.</p></div></section>
+{% if notice %}<div class="notice">{{notice}}</div>{% endif %}
+<section class="panel ai-command-panel">
+  <div class="panel-head"><div><span class="eyebrow">COMMAND</span><h2>AI operator</h2></div><span class="chip">REAL TOOLS · HUMAN REVIEW</span></div>
+  <form id="ai-command-form" class="ai-command-form">
+    <textarea id="ai-command" name="command" rows="3" placeholder="Examples: Find roofing companies in Atlanta with weak websites.&#10;Audit https://example.com and identify conversion problems.&#10;Write outreach for Acme Roofing after its website audit."></textarea>
+    <div class="ai-command-actions"><button class="primary" type="submit">Run command</button><button class="secondary" type="button" id="clear-command">Clear</button></div>
+  </form>
+  <div id="ai-command-status" class="command-status">Ready. Choose a task and the workspace will call the appropriate live engine.</div>
+  <div id="ai-command-output" class="command-output"></div>
+</section>
+<section class="grid two ai-grid">
+  <div class="panel"><div class="panel-head"><div><span class="eyebrow">FAST ACTIONS</span><h2>Start a workflow</h2></div></div>
+    <div class="quick-grid">
+      <button class="quick-action" data-command="Find property managers in Atlanta with weak or missing websites."><b>Find opportunities</b><span>Google Places → live website qualification</span></button>
+      <button class="quick-action" data-command="Find roofing companies in Atlanta with weak or missing websites."><b>Scan a niche</b><span>Discover businesses with visible website gaps</span></button>
+      <button class="quick-action" data-command="Audit https://example.com and summarize the main conversion issues."><b>Audit a website</b><span>Live HTTP inspection and findings</span></button>
+      <button class="quick-action" data-command="Write concise outreach for a prospect with a weak website."><b>Draft outreach</b><span>OpenAI-backed message preparation</span></button>
+    </div>
+  </div>
+  <div class="panel"><div class="panel-head"><div><span class="eyebrow">EXECUTION MODEL</span><h2>What the operator can do</h2></div></div>
+    <div class="operator-list">
+      <div><b>Discover</b><span>Query Google Places using the configured provider.</span></div>
+      <div><b>Qualify</b><span>Probe public websites and classify evidence-based opportunity signals.</span></div>
+      <div><b>Analyze</b><span>Run the live Website X-Ray against a supplied URL.</span></div>
+      <div><b>Write</b><span>Use OpenAI to prepare prospect-specific outreach without inventing facts.</span></div>
+      <div><b>Protect</b><span>External bulk sending remains gated by provider connection and recorded opt-in.</span></div>
+    </div>
+  </div>
+</section>
+<section class="panel"><div class="panel-head"><div><span class="eyebrow">AUTOMATION RECIPES</span><h2>Connected workflows</h2></div></div>
+{% for f in flows %}<div class="workflow-row"><div class="workflow-icon">↻</div><div><b>{{f[0]}}</b><span>{{f[1]}}</span></div><em class="state">{{f[2]}}</em><form method="post" action="/automations/run"><input type="hidden" name="automation" value="{{f[3]}}"><button type="submit" class="secondary automation-action">Open</button></form></div>{% endfor %}
+</section>
+<script>
+(() => {
+  const form=document.getElementById('ai-command-form');
+  const input=document.getElementById('ai-command');
+  const status=document.getElementById('ai-command-status');
+  const output=document.getElementById('ai-command-output');
+  const clear=document.getElementById('clear-command');
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const setBusy=(busy)=>{form.querySelector('button[type=submit]').disabled=busy; status.textContent=busy?'Working with live engines…':'Ready.';};
+  const show=(title,body,links=[])=>{output.innerHTML=`<div class="command-card"><b>${esc(title)}</b><div class="command-body">${body}</div>${links.length?`<div class="command-links">${links.map(x=>`<a class="secondary" href="${x.href}">${esc(x.label)}</a>`).join('')}</div>`:''}</div>`;};
+  async function json(url,payload){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.detail||'The live engine returned an error.');return d;}
+  async function run(command){
+    const c=command.trim(); if(!c){status.textContent='Enter a command first.';return;}
+    setBusy(true); output.innerHTML='';
+    try {
+      const lower=c.toLowerCase();
+      const urlMatch=c.match(/https?:\/\/[^\s]+/i);
+      if(urlMatch || /\b(audit|analy[sz]e)\b.*\bwebsite|website.*\b(audit|analy[sz]e)\b/i.test(c)){
+        if(!urlMatch) throw new Error('Add the full website URL so the live audit can run.');
+        const d=await json('/api/audit',{url:urlMatch[0]}); const x=d.data||{};
+        const findings=(x.findings||[]).map(f=>`<div class="command-finding"><b>${esc(f.title||f.name||'Finding')}</b><span>${esc(f.detail||f.message||f.value||'')}</span></div>`).join('');
+        show('Live website audit',`<div class="command-metric"><strong>${esc(x.score??'—')}</strong><span>opportunity / audit score</span></div><p>${esc(x.url||urlMatch[0])}</p>${findings||'<p>No findings were returned by the audit engine.</p>'}`,[{label:'Open Website X-Ray',href:'/audit'}]);
+      } else if(/\b(find|scan|discover|search)\b/.test(lower)){
+        const loc=(c.match(/\b(?:in|near|around)\s+(.+?)(?:\s+with\s+|\s+that\s+|$)/i)||[])[1]||'';
+        const cleaned=c.replace(/\b(find|scan|discover|search)\b/ig,'').replace(/\b(?:in|near|around)\s+.+$/i,'').trim()||'businesses';
+        const d=await json('/api/maps/search',{query:cleaned,location:loc,max_results:10}); const rows=d.data||[];
+        const body=rows.length?`<div class="result-count">${rows.length} live businesses returned</div><div class="command-results">${rows.map(r=>{const q=r.qualification||{};return `<div class="command-result"><div><b>${esc(r.name)}</b><span>${esc(r.address||r.location||'')}</span></div><strong>${esc(q.priority||'—')} · ${esc(q.score??'—')}</strong><small>${esc(q.website_status||'Unknown')} · ${(q.signals||[]).map(esc).join(' · ')}</small></div>`}).join('')}</div>`:'<p>No live results were returned. Check the provider configuration or refine the query.';
+        show('Live prospect discovery',body,[{label:'Open Prospect Intelligence',href:'/intelligence'}]);
+      } else if(/\b(outreach|message|write|draft|contact)\b/.test(lower)){
+        const d=await json('/api/outreach',{company:'Prospect',signal:c,service:'Website design, automation and digital systems'});
+        show('AI outreach draft',`<pre>${esc(d.data?.message||'No message returned.')}</pre>`,[{label:'Open AI Outreach',href:'/outreach'}]);
+      } else {
+        show('Command understood as a workflow request',`<p>${esc(c)}</p><p>Use a command beginning with <b>find</b>, <b>scan</b>, <b>discover</b>, <b>audit</b>, <b>analyze</b>, <b>write outreach</b> or include a full website URL.</p>`);
+      }
+      status.textContent='Completed using live platform tools.';
+    } catch(e){status.textContent='Action stopped safely.';show('Execution issue',`<p>${esc(e.message)}</p>`)}
+    finally{setBusy(false)}
+  }
+  form.addEventListener('submit',e=>{e.preventDefault();run(input.value)});
+  document.querySelectorAll('.quick-action').forEach(b=>b.addEventListener('click',()=>{input.value=b.dataset.command;run(input.value)}));
+  clear.addEventListener('click',()=>{input.value='';output.innerHTML='';status.textContent='Ready.';input.focus()});
+})();
+</script>
+{% endblock %}
