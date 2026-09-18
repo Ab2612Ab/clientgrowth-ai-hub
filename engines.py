@@ -156,14 +156,91 @@ def free_business_search(query, location=None, max_results=10):
     return results
 
 
+
+def _extract_openrouter_text(raw):
+    # OpenAI-compatible chat-completions response.
+    choices = raw.get("choices", [])
+    if not choices:
+        return ""
+    message = choices[0].get("message", {})
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, dict) and part.get("text"):
+                parts.append(part["text"])
+        return "\n".join(parts).strip()
+    return ""
+
+
+def openrouter_generate(instruction, input_text):
+    """Free AI generation through OpenRouter's free-model router.
+    Requires only an OpenRouter API key; no paid OpenAI account is required.
+    """
+    key = os.getenv("OPENROUTER_API_KEY")
+    model = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+    if not key:
+        raise RuntimeError(
+            "Free AI is not connected. Add OPENROUTER_API_KEY to enable the free OpenRouter AI engine."
+        )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": instruction},
+            {"role": "user", "content": input_text},
+        ],
+    }
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions",
+        data=data,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+            "HTTP-Referer": os.getenv("APP_URL", "https://clientgrowth-ai-hub.vercel.app"),
+            "X-Title": "ClientGrowth AI Hub",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as response:
+            raw = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="ignore")[:1000]
+        raise RuntimeError(f"OpenRouter request failed ({exc.code}): {detail}")
+    result = _extract_openrouter_text(raw)
+    if not result:
+        raise RuntimeError("OpenRouter returned no text output.")
+    return result
+
+
 def openai_generate(instruction, input_text):
+    """Backward-compatible AI entry point.
+    Prefer the free OpenRouter engine; use OpenAI only when OpenRouter is absent.
+    """
+    if os.getenv("OPENROUTER_API_KEY"):
+        return openrouter_generate(instruction, input_text)
+
     key = os.getenv("OPENAI_API_KEY")
     model = os.getenv("OPENAI_MODEL")
     if not key or not model:
-        raise RuntimeError("OpenAI is optional but not connected. Add OPENAI_API_KEY and OPENAI_MODEL to enable AI generation.")
+        raise RuntimeError(
+            "AI is not connected. Add OPENROUTER_API_KEY for the free AI engine "
+            "or OPENAI_API_KEY and OPENAI_MODEL for OpenAI."
+        )
     payload = {"model": model, "instructions": instruction, "input": input_text}
     data = json.dumps(payload).encode()
-    req = urllib.request.Request("https://api.openai.com/v1/responses", data=data, method="POST", headers={"Content-Type":"application/json", "Authorization":f"Bearer {key}"})
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=data,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+        },
+    )
     try:
         with urllib.request.urlopen(req, timeout=45) as response:
             raw = json.loads(response.read().decode())
@@ -176,4 +253,7 @@ def openai_generate(instruction, input_text):
         for part in item.get("content", []):
             if part.get("type") == "output_text" and part.get("text"):
                 texts.append(part["text"])
-    return "\n".join(texts).strip()
+    result = "\n".join(texts).strip()
+    if not result:
+        raise RuntimeError("OpenAI returned no text output.")
+    return result
