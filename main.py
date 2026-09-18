@@ -11,7 +11,7 @@ from engines import website_audit, google_places_search, openai_generate
 from intelligence import classify_prospect, whatsapp_link, campaign_guard
 
 BASE = Path(__file__).parent
-app = FastAPI(title="ClientGrowth AI Command Center", version="2.1.1")
+app = FastAPI(title="ClientGrowth AI Command Center", version="2.2.0")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")
 stages = ["New", "Qualified", "Contacted", "Replied"]
@@ -26,6 +26,8 @@ def favicon():
 def integration_state():
     return {
         "database": configured(),
+        "ai": bool(os.getenv("OPENROUTER_API_KEY") or (os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_MODEL"))),
+        "openrouter_free": bool(os.getenv("OPENROUTER_API_KEY")),
         "openai": bool(os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_MODEL")),
         "maps": bool(os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_PLACES_API_KEY")),
         "linkedin": bool(os.getenv("LINKEDIN_ACCESS_TOKEN")),
@@ -159,10 +161,10 @@ def save_settings_route(request: Request, workspace: str=Form(...), service: str
 
 @app.get("/health")
 def health():
-    db=db_status(); return {"status":"ok" if db["connected"] else "degraded","service":"clientgrowth-ai-hub","version":"2.1.1","database":db,"integrations":integration_state(),"time":datetime.now(timezone.utc).isoformat()}
+    db=db_status(); return {"status":"ok" if db["connected"] else "degraded","service":"clientgrowth-ai-hub","version":"2.2.0","database":db,"integrations":integration_state(),"time":datetime.now(timezone.utc).isoformat()}
 
 @app.get("/api")
-def api_root(): return {"status":"ok","service":"clientgrowth-ai-hub","version":"2.1.1","engines":{"database":"PostgreSQL","website_audit":"live_http","maps":"Google Places API","ai":"OpenAI Responses API","qualification":"rules+live provider data"},"endpoints":["/api/health","/api/leads","/api/maps/search","/api/prospect/qualify","/api/whatsapp/check","/api/outreach","/api/campaign/guard"]}
+def api_root(): return {"status":"ok","service":"clientgrowth-ai-hub","version":"2.1.1","engines":{"database":"PostgreSQL","website_audit":"live_http","maps":"Google Places API","ai":"OpenRouter free-model router (OpenAI-compatible) with OpenAI fallback","qualification":"rules+live provider data"},"endpoints":["/api/health","/api/leads","/api/maps/search","/api/prospect/qualify","/api/whatsapp/check","/api/outreach","/api/campaign/guard"]}
 
 @app.get("/api/health")
 def api_health(): return health()
